@@ -7,8 +7,8 @@ import time
 import numpy as np
 import tensorflow as tf
 
-import torch
-import gc
+#import torch
+#import gc
 
 # Root directory of the project
 ROOT_DIR = os.path.abspath("../../")
@@ -42,17 +42,17 @@ class CustomConfig(coco.CocoConfig):
     GPU_COUNT = 1
     BATCH_SIZE = 3
     IMAGES_PER_GPU = 3
-    NUM_CLASSES = 3  # Background + categories
+    NUM_CLASSES = 3  # Background + 4
     # Number of training steps per epoch
-    STEPS_PER_EPOCH = 1000
+    STEPS_PER_EPOCH = 700
     # Skip detections with < 80% confidence
     DETECTION_MIN_CONFIDENCE = 0.8
-
+    
 config = CustomConfig()
 config.display()
 
-torch.cuda.empty_cache()
-gc.collect()
+#torch.cuda.empty_cache()
+#gc.collect()
 
 dataset_selected_train = coco.CocoDataset()
 dataset_selected_val = coco.CocoDataset()
@@ -64,18 +64,10 @@ dataset_selected_val.load_coco(dataset_dir = "./coco_val", subset = "val", class
 dataset_selected_train.prepare()
 dataset_selected_val.prepare()
 
-model = modellib.MaskRCNN(mode="training", config=config_upd,
-                          model_dir=MODEL_DIR)
+model = modellib.MaskRCNN(mode="training", config=config,model_dir=MODEL_DIR)
+model.load_weights(COCO_MODEL_PATH, by_name=True,exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"])
 
-model.load_weights(COCO_MODEL_PATH, by_name=True,
-                       exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", 
-                                "mrcnn_bbox", "mrcnn_mask"])
+model.train(dataset_selected_train, dataset_selected_val, learning_rate=config.LEARNING_RATE, epochs=40, layers='heads')
 
-model.train(dataset_selected_train, dataset_selected_val, 
-            learning_rate=config_upd.LEARNING_RATE,
-            epochs=40,
-            layers='heads')
-
-model_path = os.path.join(MODEL_DIR, "mask_rcnn_experiment_coco.h5")
+model_path = os.path.join(MODEL_DIR, "mask_rcnn_experiment_bag_coco.h5")
 model.keras_model.save_weights(model_path)
-

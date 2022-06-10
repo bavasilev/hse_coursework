@@ -1,3 +1,4 @@
+
 import os
 import sys
 import random
@@ -41,6 +42,7 @@ class NumpyEncoder(json.JSONEncoder):
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
 def apply_mask(image, mask, color, alpha=0.5):
     """Apply the given mask to the image.
     """
@@ -69,6 +71,7 @@ def filter_objects(frame_stat, c_names, s_names):
     #cur_shape_masks = np.array(masks).shape
     #masks = np.array(masks).reshape(cur_shape_masks[1],cur_shape_masks[2],cur_shape_masks[0])
     return {'rois':np.array(rois), 'class_ids':np.array(class_ids), 'scores':np.array(scores), 'masks':np.array(masks)}
+
 def get_display_instances(image, boxes, masks, class_ids, class_names,
                       scores=None, title="",
                       figsize=(16, 16), ax=None):
@@ -92,11 +95,11 @@ def get_display_instances(image, boxes, masks, class_ids, class_names,
     '''
     # Show area outside image boundaries.
     height, width = image.shape[:2]
-
+    
     fig = Figure(figsize=((width/100),(height/100)), dpi=100.0, frameon=False, tight_layout=False)
     canvas = FigureCanvas(fig)
     ax = fig.gca()
-
+    
     # Generate random colors
     #colors = random_colors(N)
     colors=[]
@@ -150,15 +153,16 @@ def get_display_instances(image, boxes, masks, class_ids, class_names,
             verts = np.fliplr(verts) - 1
             p = Polygon(verts, facecolor="none", edgecolor=color)
             ax.add_patch(p)
-
+    
     ax.imshow(masked_image.astype(np.uint8))
     canvas.draw()       # draw the canvas, cache the renderer
+
     ret_image = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')
     #ncols, nrows = fig.canvas.get_width_height()
-
-
+    
+    
     ret_image = ret_image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-
+    
     return ret_image
 
 def masked_places_video_frames(video, root_dir, pmodel, frame_skip = 1):
@@ -167,20 +171,20 @@ def masked_places_video_frames(video, root_dir, pmodel, frame_skip = 1):
             'vien': (0,255,0)}
         print('Started')
         capture = cv2.VideoCapture(video)
-
+        
         frames_num = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = int(capture.get(cv2.CAP_PROP_FPS))
         width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         heigth = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fourcc = (capture.get(cv2.CAP_PROP_FOURCC))
         duration = frames_num/fps
-
+        
         # Define the codec and create VideoWriter object
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         id = os.path.splitext(os.path.basename(video))[0]
-
+        
         os.makedirs(os.path.join(root_dir, 'output'), exist_ok=True)
-
+        
         frames=[]
         frames_batch=[]
         video_stat=[]
@@ -189,15 +193,15 @@ def masked_places_video_frames(video, root_dir, pmodel, frame_skip = 1):
             print("%s / %s" % (i, frames_num))
             capture.set(cv2.CAP_PROP_POS_FRAMES, i)
             success,frame = capture.read()
-
+            
             if not success:
                 print('Error in reading frame %s!!!' %i)
                 continue
-
+            
             frame_bboxes = frame.copy()
             print('Frame skip before!!!', i, frame_skip)
             if (i % frame_skip == 0):
-            	print('Frame skip!!!', i, frame_skip)
+                print('Frame skip!!!', i, frame_skip)
                 frames_batch.append(frame_bboxes)
                 #probs, bboxes =.detect(Image.fromarray(frame_bboxes), pmodel, ptransform),
                 # Run detection,
@@ -206,14 +210,21 @@ def masked_places_video_frames(video, root_dir, pmodel, frame_skip = 1):
                 results = pmodel.detect(frames_batch, verbose=1)
                 #print(results)
                 for j, res in enumerate(results):
-                    #res_selected = res
-                    #res_selected = filter_objects(res, class_names, selected_names)                 
+		    #res_selected = res 
+                    #res_selected = filter_objects(res, class_names, selected_names)
+                    #print(res,'res')
+                    #print(res['rois'].shape,'rois')
+                    #print(res['masks'].shape,'masks')
+                    #print(res['class_ids'].shape,'class_ids')
+                    #print(frames_batch[j].shape,'frames_batch')
+                    #frames_batch[j] = get_display_instances(image = frames_batch[j], boxes = res[0]['rois'], masks = res[0]['masks'], class_ids = res[0]['class_ids'], class_names = class_names)
+                    #frames_batch[j] = visualize.display_instances(image = frames_batch[j], boxes = res_selected[0]['rois'], masks = res_selected[0]['masks'], class_ids = res_selected[0]['class_ids'], class_names = class_names)
                     frames_batch[j] = get_display_instances(image = frames_batch[j], boxes = res['rois'], masks = res['masks'], class_ids = res['class_ids'], class_names = class_names)
                     #print('Correct')
                     #frames_batch[j] = cv2.putText(frames_batch[j], 'Processed by VIEN VPP service', (0, heigth-10), cv2.FONT_HERSHEY_PLAIN, 0.5, vcolors['vien'], 1)
                     frames_batch[j] = cv2.cvtColor(frames_batch[j], cv2.COLOR_BGR2RGB)
                     frames.append(frames_batch[j])
-                    #print(frames_batch[j])
+		    #print(frames_batch[j])
                     PolygonVerts = []
                     for mask in res['masks']:
                         # Mask Polygon
@@ -224,10 +235,10 @@ def masked_places_video_frames(video, root_dir, pmodel, frame_skip = 1):
                         for verts in contours:
                             # Subtract the padding and flip (y, x) to (x, y)
                             verts = np.fliplr(verts) - 1
-                            PolygonVerts.append(np.array(verts, np.int32))
+                       	    PolygonVerts.append(np.array(verts, np.int32))
                     if len(res['class_ids'])>0:
-                        video_stat.append({'Timestamp':(i-8+j),
-                                           'Name': [class_names[c] for c in res['class_ids']],
+                        video_stat.append({'Timestamp':(i-8+j), 
+                                           'Name': [class_names[c] for c in res['class_ids']], 
                                            'Confidence': res['scores'],
                                            'BoundingBoxes': res['rois'],
                                            'PolygonVerts': PolygonVerts
@@ -276,7 +287,10 @@ class CustomConfig(coco.CocoConfig):
     GPU_COUNT = 1
     BATCH_SIZE = 16 #16
     IMAGES_PER_GPU = 16 #16
-    NUM_CLASSES = 3  # Background + categories
+    NUM_CLASSES = 3  # Background + 4
+    # Number of training steps per epoch
+    #STEPS_PER_EPOCH = 20
+    # Skip detections with < 80% confidence
     DETECTION_MIN_CONFIDENCE = 0.7
 
 config = CustomConfig()
@@ -286,14 +300,26 @@ model = modellib.MaskRCNN(mode="inference", config=config,model_dir=MODEL_DIR)
 model.load_weights(COCO_EXP_PATH, by_name=True)
 
 
-class_names = ['BG','laptop', 'tv']
-selected_names = ['laptop', 'tv']
+#video_dir = 'office 480p cut_orginal.avi'
+#root_dir = ''
 
+#t1 = 50
+#t2 = 60
+#ffmpeg_extract_subclip(video_dir, t1, t2, targetname="test.mp4")
+#display(mpy.ipython_display("test.mp4", height=400 , autoplay=1, loop=1, maxduration=100))
+class_names = ['BG','backpack', 'handbag']
+selected_names = ['backpack', 'handbag']
+
+
+##############################################################################################3
+
+
+import numpy as np
 def get_ax(rows=1, cols=1, size=16):
     """Return a Matplotlib Axes array to be used in
     all visualizations in the notebook. Provide a
     central point to control graph sizes.
-
+    
     Adjust the size attribute to control how big to render images
     """
     _, ax = plt.subplots(rows, cols, figsize=(size*cols, size*rows))
@@ -333,20 +359,25 @@ def display_instances_exp(image, boxes, masks, class_ids, class_names,
     #colors = colors or random_colors(N)
     colors=[]
     for i in range(N):
-        object_color = []
-        object_color=list(map(lambda i:round(i,3),list(np.random.choice(range(256), size=3)/256)))
-        object_color.append(0.8)
-        colors.append(object_color)
+    	object_color = []
+    	object_color=list(map(lambda i:round(i,3),list(np.random.choice(range(256), size=3)/256)))
+    	object_color.append(0.8)
+    	colors.append(object_color)
+    #for i in range(N):
+   	#colors.append(list(map(lambda i:round(i,3),list(np.random.choice(range(256), size=4)/256))))
+    # colors = list(map(lambda i:round(i,1),list(np.random.choice(range(256), size=3)/256)))
+    #colors = [[0.9,0,0,0.8], [0,0.9,0,0.8], [0,0,0.9,0.8]]
     # Show area outside image boundaries.
     height, width = image.shape[:2]
     ax.set_ylim(height + 10, -10)
     ax.set_xlim(-10, width + 10)
     ax.axis('off')
     ax.set_title(title)
-
+    
     masked_image = image.astype(np.uint32).copy()
     for i in range(N):
         color = colors[i]
+
         # Bounding box
         if not np.any(boxes[i]):
             # Skip this instance. Has no bbox. Likely lost in image cropping.
@@ -397,11 +428,26 @@ def display_instances_exp(image, boxes, masks, class_ids, class_names,
 
 video_dir = "./test_vid_bag.mp4"
 
+from skimage import io
+images = [io.imread('./test_2.jpg')] #io.imread('https://img3.goodfon.ru/original/1920x1200/0/cc/vino-beloe-bokal-butylka-stol.jpg')]
+#print(images[0])
+#ax = get_ax(1)
+#res = model.detect(images, verbose=1)
+#print(res)
+#display_instances_exp(images[0], res[0]['rois'], res[0]['masks'], res[0]['class_ids'], class_names, res[0]['scores'],ax=ax)
+#plt.savefig('output_fig.png')
+#print(img)
+#io.imsave(os.path.join('', res.jpg), img[0])
+#display_instances_exp(images[0], res[0]['rois'], res[0]['masks'], res[0]['class_ids'], class_names, res[0]['scores'],ax=ax)
+
 
 
 output = masked_places_video_frames(video_dir, '.', model, 2)
 dumped = json.dumps(output[1], cls=NumpyEncoder)
 
-with open('data_480p.json', 'w') as fp:
-    json.dump(dumped, fp)
-    #print(dumped, file=fp)
+with open('data_480p_bags.json', 'w') as fp:
+    #json.dump(dumped, fp)
+    print(dumped, file=fp)
+
+
+
